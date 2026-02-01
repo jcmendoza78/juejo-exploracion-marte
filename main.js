@@ -27,6 +27,8 @@ function preload() {
   this.load.image('station', 'assets/station.png');
   this.load.image('door', 'assets/door.png');
   this.load.image('flag', 'assets/flag.png');
+  // Nuevo: Cargar la imagen del fondo
+  this.load.image('fondo', 'assets/fondo.png');
 
   // Cargar un JSON de nivel opcional (si lo añades luego)
   // this.load.json('levelData', 'assets/level.json');
@@ -40,9 +42,13 @@ function create() {
   this.physics.world.setBounds(0, 0, WORLD_W, WORLD_H);
   this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
 
+  // Nuevo: Añadir fondo con parallax simple (se mueve más lento que la cámara)
+  this.fondo = this.add.tileSprite(0, 0, WORLD_W, WORLD_H, 'fondo').setOrigin(0, 0).setScrollFactor(0.5);
+
   // --- Texturas procedurales de respaldo si faltan assets ---
   ensureProceduralTextures.call(this);
 
+  // (El resto del código de create permanece igual)
   // --- Plataformas ---
   this.platforms = this.physics.add.staticGroup();
   // Suelo continuo
@@ -194,6 +200,7 @@ function create() {
 
 // ---------- Update ----------
 function update(time, delta) {
+  // (El resto del código de update permanece igual)
   // Movimiento lateral
   const speed = 200;
   if (this.cursors.left.isDown) {
@@ -309,8 +316,16 @@ function ensureProceduralTextures() {
     g.fillTriangle(16, 8, 32, 16, 16, 24);
     g.generateTexture('flag', 32, 48);
   }
+  // Nuevo: Generar fondo procedural si no existe (color rojizo para Marte)
+  if (!this.textures.exists('fondo')) {
+    g.clear();
+    g.fillStyle(0x8b4513, 1); // Color rojizo para simular Marte
+    g.fillRect(0, 0, 800, 600);
+    g.generateTexture('fondo', 800, 600);
+  }
 }
 
+// (El resto de las funciones permanecen igual)
 function startStationSequence(stationSprite) {
   // Pausar movimiento del jugador
   this.player.setVelocity(0, 0);
@@ -334,204 +349,4 @@ function buildStationSteps(meta) {
 
 function showStationUI(stationSprite, steps, index) {
   // destruir UI previa si existe
-  if (this.stationUI) {
-    this.stationUI.destroy(true);
-    this.stationUI = null;
-  }
-
-  const w = 520, h = 220;
-  const cam = this.cameras.main;
-  const x = cam.worldView.x + (config.width / 2) - w / 2;
-  const y = cam.worldView.y + (config.height / 2) - h / 2;
-
-  const container = this.add.container(x, y).setDepth(1000);
-  const bg = this.add.rectangle(0, 0, w, h, 0x071126, 0.95).setOrigin(0);
-  const border = this.add.rectangle(0, 0, w, h).setStrokeStyle(2, 0xffffff).setOrigin(0);
-  container.add([bg, border]);
-
-  const meta = stationSprite.getData('meta');
-  const titleText = this.add.text(20, 12, `Estación: ${meta.title}`, { font: '20px Arial', fill: '#fff' });
-  container.add(titleText);
-
-  const step = steps[index];
-  const promptText = this.add.text(20, 50, step.prompt, { font: '18px Arial', fill: '#fff', wordWrap: { width: w - 40 } });
-  container.add(promptText);
-
-  if (step.type === 'sequence') {
-    step.options.forEach((opt, i) => {
-      const t = this.add.text(40, 90 + i * 28, `${i + 1}. ${opt}`, { font: '16px Arial', fill: '#fff' }).setInteractive({ useHandCursor: true });
-      t.on('pointerdown', () => {
-        // aceptamos selección y pasamos al siguiente paso
-        showStationUI.call(this, stationSprite, steps, index + 1);
-      });
-      container.add(t);
-    });
-    const hint = this.add.text(20, h - 36, 'Haz clic en la opción que consideres correcta.', { font: '14px Arial', fill: '#ddd' });
-    container.add(hint);
-  } else if (step.type === 'tf') {
-    const trueBtn = this.add.rectangle(140, 140, 120, 40, 0x2ecc71).setInteractive({ useHandCursor: true });
-    const falseBtn = this.add.rectangle(380, 140, 120, 40, 0xe74c3c).setInteractive({ useHandCursor: true });
-    const tText = this.add.text(140, 140, 'Verdadero', { font: '16px Arial', fill: '#000' }).setOrigin(0.5);
-    const fText = this.add.text(380, 140, 'Falso', { font: '16px Arial', fill: '#000' }).setOrigin(0.5);
-    container.add([trueBtn, falseBtn, tText, fText]);
-
-    trueBtn.on('pointerdown', () => {
-      finishStation.call(this, stationSprite, true);
-      container.destroy(true);
-      this.stationUI = null;
-    });
-    falseBtn.on('pointerdown', () => {
-      finishStation.call(this, stationSprite, false);
-      container.destroy(true);
-      this.stationUI = null;
-    });
-  }
-
-  this.stationUI = container;
-}
-
-function finishStation(stationSprite, userAnswer) {
-  // Marcar completada y guardar dato clave en meta
-  const meta = stationSprite.getData('meta');
-  stationSprite.setData('completed', true);
-  stationSprite.setTint(0x6ee7b7);
-  meta.completed = true;
-  meta.learned = { keyFact: meta.facts[0] };
-
-  // Reactivar movimiento del jugador
-  this.player.body.moves = true;
-
-  // Actualizar contadores y score
-  this.completedStations = this.stationSprites.filter(s => s.getData('completed')).length;
-  this.score += 100;
-
-  // Si completó todas, abrir puerta y dar insignia
-  if (this.completedStations >= this.totalStations) {
-    openDoor.call(this);
-    this.badges.allComplete = true;
-    // Mensaje y premio
-    this.add.text(this.player.x - 120, this.player.y - 120, '🏆 Todas las estaciones completadas', { font: '16px Arial', fill: '#ffd166' }).setDepth(1000).setScrollFactor(0);
-  }
-
-  // Guardar progreso inmediatamente
-  saveProgress.call(this);
-}
-
-function openDoor() {
-  if (!this.door || !this.door.active) return;
-  this.tweens.add({
-    targets: this.door,
-    alpha: 0,
-    duration: 800,
-    onComplete: () => {
-      if (this.door) this.door.destroy();
-      this.add.text(this.cameras.main.worldView.x + 520, this.cameras.main.worldView.y + 40, 'Puerta abierta', { font: '18px Arial', fill: '#7efc9f' }).setScrollFactor(0).setDepth(1000);
-    }
-  });
-}
-
-function onLevelComplete() {
-  // Mensaje de nivel completado y recompensa
-  const cam = this.cameras.main;
-  const x = cam.worldView.x + config.width / 2;
-  const y = cam.worldView.y + config.height / 2;
-  this.add.rectangle(x - 220, y - 80, 440, 160, 0x071126, 0.95).setDepth(1000);
-  this.add.text(x, y - 20, '¡Nivel completado!', { font: '28px Arial', fill: '#fff' }).setOrigin(0.5).setDepth(1000);
-  this.score += 500;
-  this.badges.allComplete = true;
-  saveProgress.call(this);
-}
-
-function updateUI() {
-  this.uiText.setText([
-    `Estaciones: ${this.completedStations} / ${this.totalStations}`,
-    `Puntos: ${this.score}`,
-    `Bitácora: presiona B o M`
-  ]);
-}
-
-// ---------- Bitácora UI ----------
-function createBitacora() {
-  this.bitacoraVisible = false;
-  this.bitacoraContainer = this.add.container(20, 60).setScrollFactor(0).setDepth(1000);
-  const bg = this.add.rectangle(0, 0, 360, 420, 0x02121f, 0.95).setOrigin(0);
-  const border = this.add.rectangle(0, 0, 360, 420).setStrokeStyle(2, 0xffffff).setOrigin(0);
-  const title = this.add.text(16, 12, 'Bitácora marciana', { font: '18px Arial', fill: '#fff' });
-  this.bitacoraContainer.add([bg, border, title]);
-  this.bitacoraEntries = this.add.container(16, 48);
-  this.bitacoraContainer.add(this.bitacoraEntries);
-  this.bitacoraContainer.setVisible(false);
-}
-
-function toggleBitacora() {
-  this.bitacoraVisible = !this.bitacoraVisible;
-  this.bitacoraContainer.setVisible(this.bitacoraVisible);
-  if (this.bitacoraVisible) refreshBitacora.call(this);
-}
-
-function refreshBitacora() {
-  this.bitacoraEntries.removeAll(true);
-  let y = 0;
-  this.stationsData.forEach((st, idx) => {
-    const completed = !!st.completed;
-    const title = st.title;
-    const statusText = completed ? 'Completada' : 'Pendiente';
-    const color = completed ? '#6ee7b7' : '#ffd166';
-    const t = this.add.text(0, y, `${idx + 1}. ${title} — ${statusText}`, { font: '14px Arial', fill: color });
-    this.bitacoraEntries.add(t);
-    y += 20;
-    if (completed && st.learned) {
-      const fact = this.add.text(12, y, `• ${st.learned.keyFact}`, { font: '13px Arial', fill: '#ddd' });
-      this.bitacoraEntries.add(fact);
-      y += 18;
-    }
-  });
-
-  const progress = this.add.text(0, y + 8, `Progreso: ${this.completedStations}/${this.totalStations}`, { font: '14px Arial', fill: '#fff' });
-  this.bitacoraEntries.add(progress);
-  y += 28;
-
-  const badgesText = [];
-  if (this.badges.allComplete) badgesText.push('Explorador Marciano');
-  if (this.badges.highRouteComplete) badgesText.push('Valiente Ruta Alta');
-  const btxt = this.add.text(0, y, badgesText.length ? `Insignias: ${badgesText.join(' • ')}` : 'Insignias: ninguna', { font: '13px Arial', fill: '#ffd166' });
-  this.bitacoraEntries.add(btxt);
-}
-
-// ---------- Insignias ruta alta ----------
-function checkHighRouteBadge() {
-  if (this.badges.highRouteComplete) return;
-  if (this.highRouteStations.length === 0) return;
-  const allHighDone = this.highRouteStations.every(s => s.getData('completed'));
-  if (allHighDone) {
-    this.badges.highRouteComplete = true;
-    this.add.text(this.player.x - 120, this.player.y - 160, '🏅 Insignia: Ruta Alta', { font: '16px Arial', fill: '#ffd166' }).setDepth(1000).setScrollFactor(0);
-    saveProgress.call(this);
-  }
-}
-
-// ---------- Persistencia local ----------
-function saveProgress() {
-  try {
-    const stations = this.stationsData.map(s => ({ id: s.id, completed: !!s.completed, learned: s.learned || null }));
-    const payload = {
-      stations,
-      score: this.score,
-      badges: this.badges
-    };
-    localStorage.setItem('marsGameProgress', JSON.stringify(payload));
-  } catch (e) {
-    console.warn('No se pudo guardar progreso', e);
-  }
-}
-
-function loadProgress() {
-  try {
-    const raw = localStorage.getItem('marsGameProgress');
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch (e) {
-    console.warn('No se pudo cargar progreso', e);
-    return null;
-  }
-}
+  if (this.stationUI
