@@ -21,6 +21,7 @@ const game = new Phaser.Game(config);
 // ---------- Preload ----------
 function preload() {
   // Intentamos cargar assets externos si existen; si no, generamos texturas procedurales en create.
+  this.load.image('background', 'assets/back.png')
   this.load.image('ground', 'assets/ground.png');
   this.load.image('ladder', 'assets/ladder.png');
   this.load.image('player', 'assets/player.png');
@@ -32,58 +33,201 @@ function preload() {
   // this.load.json('levelData', 'assets/level.json');
 }
 
-// ----------  ----------
+// ---------- Create ----------
 function create() {
   const WORLD_W = 3000;
   const WORLD_H = 600;
-  
-  // 1. Configuración de límites [cite: 6, 7]
   this.physics.world.setBounds(0, 0, WORLD_W, WORLD_H);
   this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
-
-  // 2. Fondo (Asegúrate de tener 'background.png' de 3000x600 en assets) 
-  // Lo ponemos primero para que esté al fondo de todo
+  
   this.bg = this.add.tileSprite(0, 0, WORLD_W, WORLD_H, "background")
     .setOrigin(0)
-    .setScrollFactor(0.5); // Efecto parallax: el fondo se mueve más lento
+    .setScrollFactor(0.5) // Esto da sensación de profundidad 
+    .setDepth(-1);
 
-  // 3. Grupo de plataformas [cite: 8]
+  // Fondo con parallax
+  this.bg = this.add.tileSprite(0, 0, config.width, config.height, "background")
+    .setOrigin(0)
+    .setScrollFactor(0)
+    .setDepth(-1);
+
+  // Plataformas
   this.platforms = this.physics.add.staticGroup();
-
-  // Suelo base [cite: 8, 9]
   for (let x = 0; x < WORLD_W; x += 200) {
     this.platforms.create(x + 100, WORLD_H - 20, "ground");
   }
 
-  // --- CREATIVIDAD: Generación de paisaje marciano ---
-  // Añadimos plataformas a distintas alturas de forma aleatoria
-  for (let i = 0; i < 15; i++) {
-    let rx = Phaser.Math.Between(400, WORLD_W - 400);
-    let ry = Phaser.Math.Between(200, 450);
-    this.platforms.create(rx, ry, 'ground').setScale(0.8).refreshBody();
+  // Jugador
+  this.player = this.physics.add.sprite(100, 450, "player").setScale(0.5);
+  this.player.setCollideWorldBounds(true);
+  this.player.setBounce(0.05);
+  this.player.body.setSize(this.player.width * 0.6, this.player.height * 0.9);
+  this.player.body.setOffset(this.player.width * 0.2, 0);
+
+  this.physics.add.collider(this.player, this.platforms);
+
+  // Puerta
+  this.door = this.physics.add.staticSprite(WORLD_W - 600, WORLD_H - 120, "door");
+  this.physics.add.collider(this.player, this.door);
+  this.physics.add.overlap(this.player, this.door, () => {
+    showEndMessage.call(this);
+  });
+
+  // Bandera opcional
+  this.flag = this.physics.add.staticSprite(WORLD_W - 200, WORLD_H - 120, "flag");
+  this.physics.add.overlap(this.player, this.flag, () => {
+    showEndMessage.call(this);
+  });
+
+  // Cámara
+  this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+
+  // UI
+  this.uiText = this.add.text(16, 16, "Explora Marte y llega a la puerta", {
+    font: "16px Arial",
+    fill: "#ffffff"
+  }).setScrollFactor(0);
+
+
+  // Plataformas ruta baja (más accesible)
+  this.platforms.create(400, 500, 'ground').refreshBody();
+  this.platforms.create(800, 520, 'ground').refreshBody();
+  this.platforms.create(1200, 540, 'ground').refreshBody();
+  this.platforms.create(1600, 520, 'ground').refreshBody();
+  this.platforms.create(2000, 540, 'ground').refreshBody();
+
+  // Plataformas ruta alta (más retadora)
+  this.platforms.create(400, 300, 'ground').refreshBody();
+  this.platforms.create(800, 320, 'ground').refreshBody();
+  this.platforms.create(1200, 340, 'ground').refreshBody();
+  this.platforms.create(1800, 300, 'ground').refreshBody();
+  this.platforms.create(2400, 320, 'ground').refreshBody();
+
+  // Conectores tipo escalera (sprites con overlap)
+  this.ladders = this.physics.add.staticGroup();
+  const ladder1 = this.ladders.create(600, 400, 'ladder').setOrigin(0.5, 0.5);
+  const ladder2 = this.ladders.create(1000, 420, 'ladder').setOrigin(0.5, 0.5);
+  const ladder3 = this.ladders.create(2100, 360, 'ladder').setOrigin(0.5, 0.5);
+  ladder1.body.setSize(40, 160).setOffset(-20, -80);
+  ladder2.body.setSize(40, 160).setOffset(-20, -80);
+  ladder3.body.setSize(40, 160).setOffset(-20, -80);
+
+  // --- Jugador ---
+  this.player = this.physics.add.sprite(100, 450, 'player');
+  this.player.setCollideWorldBounds(true);
+  this.player.body.setSize(this.player.width * 0.6, this.player.height * 0.9).setOffset(this.player.width * 0.2, 0);
+  this.player.setBounce(0.05);
+
+  // --- Controles ---
+  this.cursors = this.input.keyboard.createCursorKeys();
+  this.keyB = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.B);
+  this.keyM = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M);
+
+  // --- Coyote time y jump buffer ---
+  this.coyoteTimeMax = 120; // ms
+  this.jumpBufferMax = 150; // ms
+  this.coyoteTimer = 0;
+  this.jumpBufferTimer = 0;
+
+  // --- Colisiones ---
+  this.physics.add.collider(this.player, this.platforms);
+
+  // --- Ladders overlap handling ---
+  this.onLadder = false;
+  this.physics.add.overlap(this.player, this.ladders, (player, ladder) => {
+    // marcar que está en zona de escalera; no desactivar gravedad aún
+    player.setData('onLadderZone', true);
+    player.setData('ladder', ladder);
+  }, null, this);
+
+  // limpiar flag cuando sale de ladder zone
+  this.physics.add.overlap(this.player, this.ladders, null, (player, ladder) => {
+    // la función anterior marca la zona; aquí no hacemos nada extra
+    return false;
+  }, this);
+
+  // detectar salida de zona de escalera con un pequeño timer en update
+
+  // --- Estaciones educativas ---
+  // Definimos estaciones con tema, posición, ruta (high/low) y 2 mini-retos
+  this.stationsData = [
+    { id: 0, title: 'Atmósfera', x: 400, y: 260, route: 'high', facts: ['95% CO2', 'Presión muy baja'] },
+    { id: 1, title: 'Agua y hielo', x: 800, y: 480, route: 'low', facts: ['Casquetes polares', 'Hielo subterráneo'] },
+    { id: 2, title: 'Geología', x: 1200, y: 300, route: 'high', facts: ['Monte Olimpo', 'Cráteres abundantes'] },
+    { id: 3, title: 'Misiones', x: 1600, y: 500, route: 'low', facts: ['Curiosity desde 2012', 'Perseverance llegó en 2021'] },
+    { id: 4, title: 'Radiación', x: 2000, y: 280, route: 'high', facts: ['Radiación mayor', 'Protección necesaria'] },
+    { id: 5, title: 'Comunicación', x: 2400, y: 320, route: 'high', facts: ['Retraso ~20 min', 'Orbitadores como repetidores'] }
+  ];
+
+  // Restaurar progreso desde localStorage si existe
+  const saved = loadProgress();
+  if (saved && saved.stations) {
+    // merge saved completed flags into stationsData
+    this.stationsData.forEach(sd => {
+      const s = saved.stations.find(x => x.id === sd.id);
+      if (s) sd.completed = !!s.completed;
+    });
   }
 
-  // 4. Estaciones Educativas (Se mantienen de tu data) [cite: 27, 32]
   this.stations = this.physics.add.staticGroup();
+  this.stationSprites = [];
+  this.highRouteStations = [];
   this.stationsData.forEach(st => {
     const sprite = this.stations.create(st.x, st.y, 'station');
     sprite.setData('meta', st);
-    // ... resto de tu lógica de estaciones [cite: 32]
+    sprite.setData('completed', !!st.completed);
+    if (st.completed) sprite.setTint(0x6ee7b7);
+    this.stationSprites.push(sprite);
+    if (st.route === 'high') this.highRouteStations.push(sprite);
   });
 
-  // 5. Jugador [cite: 20]
-  this.player = this.physics.add.sprite(100, 450, 'player');
-  this.player.setCollideWorldBounds(true);
-  this.player.setBounce(0.1); // Un poco más de rebote para Marte
-  this.player.body.setSize(this.player.width * 0.6, this.player.height * 0.9);
+  this.physics.add.overlap(this.player, this.stations, (player, station) => {
+    if (!station.getData('completed')) {
+      startStationSequence.call(this, station);
+    }
+  }, null, this);
 
-  // 6. Colisiones y Cámara [cite: 23, 37]
-  this.physics.add.collider(this.player, this.platforms);
+  // --- Puerta y bandera ---
+  this.door = this.physics.add.staticSprite(WORLD_W - 600, WORLD_H - 120, 'door');
+  this.flag = this.physics.add.staticSprite(WORLD_W - 200, WORLD_H - 120, 'flag');
+  this.flag.setData('reached', false);
+
+  // Bloqueo físico por puerta
+  this.physics.add.collider(this.player, this.door);
+
+  // Overlap con bandera para terminar nivel
+  this.physics.add.overlap(this.player, this.flag, () => {
+    const allDone = this.stationSprites.every(s => s.getData('completed'));
+    if (allDone && !this.flag.getData('reached')) {
+      this.flag.setData('reached', true);
+      onLevelComplete.call(this);
+    }
+  }, null, this);
+
+  // --- Cámara ---
   this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
 
-  // Inicializar UI y Controles [cite: 21, 39]
-  this.cursors = this.input.keyboard.createCursorKeys();
+  // --- UI y bitácora ---
+  this.score = saved && saved.score ? saved.score : 0;
+  this.completedStations = this.stationSprites.filter(s => s.getData('completed')).length;
+  this.totalStations = this.stationSprites.length;
+  this.uiText = this.add.text(12, 12, '', { font: '16px Arial', fill: '#ffffff' }).setScrollFactor(0);
   updateUI.call(this);
+
+  // Bitácora container (oculto)
+  createBitacora.call(this);
+
+  // Toggle bitácora
+  this.input.keyboard.on('keydown-B', () => toggleBitacora.call(this));
+  this.input.keyboard.on('keydown-M', () => toggleBitacora.call(this));
+
+  // --- Insignias estado ---
+  this.badges = saved && saved.badges ? saved.badges : { allComplete: false, highRouteComplete: false };
+
+  // Mensaje inicial si ya completado
+  if (this.badges.allComplete) {
+    this.add.text(300, 80, '🏅 Insignia: Explorador Marciano', { font: '18px Arial', fill: '#ffd166' }).setScrollFactor(0);
+  }
 }
 
 // ---------- Update ----------
