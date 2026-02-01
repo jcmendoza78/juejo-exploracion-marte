@@ -112,8 +112,11 @@ function create() {
   ladder2.body.setSize(40, 160).setOffset(-20, -80);
   ladder3.body.setSize(40, 160).setOffset(-20, -80);
 
-
-
+  // --- Jugador ---
+  this.player = this.physics.add.sprite(100, 450, 'player');
+  this.player.setCollideWorldBounds(true);
+  this.player.body.setSize(this.player.width * 0.6, this.player.height * 0.9).setOffset(this.player.width * 0.2, 0);
+  this.player.setBounce(0.05);
 
   // --- Controles ---
   this.cursors = this.input.keyboard.createCursorKeys();
@@ -229,7 +232,6 @@ function create() {
 
 // ---------- Update ----------
 function update(time, delta) {
-  this.bg.tilePositionX = this.cameras.main.scrollX * 0.5;
   // Movimiento lateral
   const speed = 200;
   if (this.cursors.left.isDown) {
