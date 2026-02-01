@@ -21,7 +21,6 @@ const game = new Phaser.Game(config);
 // ---------- Preload ----------
 function preload() {
   // Intentamos cargar assets externos si existen; si no, generamos texturas procedurales en create.
-  this.load.image('background', 'assets/back.png')
   this.load.image('ground', 'assets/ground.png');
   this.load.image('ladder', 'assets/ladder.png');
   this.load.image('player', 'assets/player.png');
@@ -39,11 +38,6 @@ function create() {
   const WORLD_H = 600;
   this.physics.world.setBounds(0, 0, WORLD_W, WORLD_H);
   this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
-  
-  this.bg = this.add.tileSprite(0, 0, WORLD_W, WORLD_H, "background")
-    .setOrigin(0)
-    .setScrollFactor(0.5) // Esto da sensación de profundidad 
-    .setDepth(-1);
 
   // Fondo con parallax
   this.bg = this.add.tileSprite(0, 0, config.width, config.height, "background")
