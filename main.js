@@ -232,6 +232,7 @@ function create() {
 
 // ---------- Update ----------
 function update(time, delta) {
+  this.bg.tilePositionX = this.cameras.main.scrollX * 0.5;
   // Movimiento lateral
   const speed = 200;
   if (this.cursors.left.isDown) {
