@@ -1,6 +1,5 @@
 // ===============================
 // JUEGO EDUCATIVO – MARTE (Phaser 3)
-// Mejora estética sin cambiar mecánicas
 // ===============================
 
 const config = {
@@ -37,7 +36,6 @@ function preload() {
 
 // ---------- CREATE ----------
 function create() {
-
   const WORLD_W = 3000;
   const WORLD_H = 600;
 
@@ -45,24 +43,22 @@ function create() {
   this.physics.world.setBounds(0, 0, WORLD_W, WORLD_H);
   this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
 
-  // Fondo con parallax (estético)
+  // Fondo con parallax
   this.bg = this.add
-    .tileSprite(0, 0, WORLD_W, WORLD_H, "background")
+    .tileSprite(0, 0, config.width, config.height, "background")
     .setOrigin(0)
-    .setScrollFactor(0.3);
+    .setScrollFactor(0)
+    .setDepth(-1);
 
   // Plataformas
   platforms = this.physics.add.staticGroup();
-
   for (let x = 0; x < WORLD_W; x += 200) {
     platforms.create(x + 100, WORLD_H - 20, "ground");
   }
-
   platforms.create(400, 480, "ground");
   platforms.create(800, 520, "ground");
   platforms.create(1200, 500, "ground");
   platforms.create(1600, 520, "ground");
-
   platforms.create(600, 300, "ground");
   platforms.create(1000, 320, "ground");
   platforms.create(1400, 340, "ground");
@@ -86,7 +82,7 @@ function create() {
   // Colisiones
   this.physics.add.collider(player, platforms);
 
-  // Estaciones
+  // Estaciones educativas
   const stationData = [
     { x: 400, y: 260, title: "Atmósfera" },
     { x: 800, y: 500, title: "Agua" },
@@ -107,7 +103,6 @@ function create() {
   // Puerta y bandera
   this.door = this.physics.add.staticSprite(WORLD_W - 600, WORLD_H - 120, "door");
   this.flag = this.physics.add.staticSprite(WORLD_W - 200, WORLD_H - 120, "flag");
-
   this.physics.add.collider(player, this.door);
 
   this.physics.add.overlap(player, this.flag, () => {
@@ -121,10 +116,7 @@ function create() {
 
   // UI
   uiText = this.add
-    .text(16, 16, "", {
-      font: "16px Arial",
-      fill: "#ffffff"
-    })
+    .text(16, 16, "", { font: "16px Arial", fill: "#ffffff" })
     .setScrollFactor(0);
 
   updateUI();
@@ -132,7 +124,6 @@ function create() {
 
 // ---------- UPDATE ----------
 function update() {
-
   const speed = 220;
 
   if (cursors.left.isDown) {
@@ -165,9 +156,12 @@ function update() {
     player.body.allowGravity = true;
   }
 
+  // Parallax del fondo
+  this.bg.tilePositionX = this.cameras.main.scrollX * 0.5;
+  this.bg.tilePositionY = this.cameras.main.scrollY * 0.2;
+
   updateUI();
 }
-
 // ---------- FUNCIONES ----------
 
 function stationTouched(player, station) {
