@@ -1,202 +1,220 @@
-// main.js - Versión Corregida y Jerarquizada para Phaser 3
+// ===============================
+// JUEGO EDUCATIVO – MARTE (Phaser 3)
+// Mejora estética sin cambiar mecánicas
+// ===============================
+
 const config = {
   type: Phaser.AUTO,
   width: 800,
   height: 600,
+  backgroundColor: "#000000",
   physics: {
-    default: 'arcade',
+    default: "arcade",
     arcade: {
-      gravity: { y: 600 },
+      gravity: { y: 700 },
       debug: false
     }
   },
   scene: { preload, create, update }
 };
 
-const game = new Phaser.Game(config);
+new Phaser.Game(config);
 
-// ---------- Preload ----------
+let player, cursors, platforms, ladders;
+let stations = [];
+let uiText;
+
+// ---------- PRELOAD ----------
 function preload() {
-  this.load.image('ground', 'assets/ground.png');
-  this.load.image('ladder', 'assets/ladder.png');
-  this.load.image('player', 'assets/player.png');
-  this.load.image('station', 'assets/station.png');
-  this.load.image('door', 'assets/door.png');
-  this.load.image('flag', 'assets/flag.png');
-  this.load.image('fondo', 'assets/fondo.png');
+  this.load.image("background", "assets/fondo.png");
+  this.load.image("player", "assets/personaje.png");
+  this.load.image("ground", "assets/ground.png");
+  this.load.image("ladder", "assets/ladder.png");
+  this.load.image("station", "assets/station.png");
+  this.load.image("door", "assets/door.png");
+  this.load.image("flag", "assets/flag.png");
 }
 
-// ---------- Create ----------
+// ---------- CREATE ----------
 function create() {
+
   const WORLD_W = 3000;
   const WORLD_H = 600;
+
+  // Mundo
   this.physics.world.setBounds(0, 0, WORLD_W, WORLD_H);
   this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
 
-  // Texturas de respaldo (por si fallan los assets)
-  ensureProceduralTextures.call(this);
-
-  // Fondo con parallax
-  this.fondo = this.add.tileSprite(0, 0, config.width, config.height, 'fondo')
-    .setOrigin(0, 0)
-    .setScrollFactor(0)
-    .setDepth(-1);
+  // Fondo con parallax (estético)
+  this.bg = this.add
+    .tileSprite(0, 0, WORLD_W, WORLD_H, "background")
+    .setOrigin(0)
+    .setScrollFactor(0.3);
 
   // Plataformas
-  this.platforms = this.physics.add.staticGroup();
+  platforms = this.physics.add.staticGroup();
+
   for (let x = 0; x < WORLD_W; x += 200) {
-    this.platforms.create(x + 100, WORLD_H - 20, 'ground').refreshBody();
+    platforms.create(x + 100, WORLD_H - 20, "ground");
   }
 
-  // Rutas
-  [500, 520, 540, 520, 540].forEach((y, i) => this.platforms.create(400 + (i * 400), y, 'ground').refreshBody());
-  [300, 320, 340, 300, 320].forEach((y, i) => this.platforms.create(400 + (i * 400), y, 'ground').refreshBody());
+  platforms.create(400, 480, "ground");
+  platforms.create(800, 520, "ground");
+  platforms.create(1200, 500, "ground");
+  platforms.create(1600, 520, "ground");
+
+  platforms.create(600, 300, "ground");
+  platforms.create(1000, 320, "ground");
+  platforms.create(1400, 340, "ground");
+  platforms.create(2000, 300, "ground");
 
   // Escaleras
-  this.ladders = this.physics.add.staticGroup();
-  const ladderPos = [{x: 600, y: 400}, {x: 1000, y: 420}, {x: 2100, y: 360}];
-  ladderPos.forEach(pos => {
-    let l = this.ladders.create(pos.x, pos.y, 'ladder');
-    l.body.setSize(40, 160);
-  });
+  ladders = this.physics.add.staticGroup();
+  ladders.create(600, 390, "ladder");
+  ladders.create(1000, 410, "ladder");
+  ladders.create(2000, 360, "ladder");
 
   // Jugador
-  this.player = this.physics.add.sprite(100, 450, 'player');
-  this.player.setCollideWorldBounds(true).setBounce(0.05);
+  player = this.physics.add.sprite(100, 450, "player");
+  player.setCollideWorldBounds(true);
+  player.setBounce(0.05);
+  player.body.setSize(player.width * 0.6, player.height * 0.9);
 
-  // Controles
-  this.cursors = this.input.keyboard.createCursorKeys();
-  
-  // Datos de estaciones
-  this.stationsData = [
-    { id: 0, title: 'Atmósfera', x: 400, y: 260, route: 'high', facts: ['95% CO2'] },
-    { id: 1, title: 'Agua', x: 800, y: 480, route: 'low', facts: ['Hielo subterráneo'] },
-    { id: 2, title: 'Geología', x: 1200, y: 300, route: 'high', facts: ['Monte Olimpo'] }
+  // Cámara
+  this.cameras.main.startFollow(player, true, 0.08, 0.08);
+
+  // Colisiones
+  this.physics.add.collider(player, platforms);
+
+  // Estaciones
+  const stationData = [
+    { x: 400, y: 260, title: "Atmósfera" },
+    { x: 800, y: 500, title: "Agua" },
+    { x: 1200, y: 300, title: "Geología" },
+    { x: 1600, y: 520, title: "Misiones" },
+    { x: 2000, y: 280, title: "Radiación" }
   ];
 
-  this.stations = this.physics.add.staticGroup();
-  this.stationSprites = [];
-  this.highRouteStations = [];
-
-  this.stationsData.forEach(st => {
-    const sprite = this.stations.create(st.x, st.y, 'station');
-    sprite.setData('meta', st);
-    this.stationSprites.push(sprite);
-    if (st.route === 'high') this.highRouteStations.push(sprite);
+  stationData.forEach(data => {
+    const s = this.physics.add.staticSprite(data.x, data.y, "station");
+    s.setData("title", data.title);
+    s.setData("completed", false);
+    stations.push(s);
   });
 
-  // Colisiones y Overlaps
-  this.physics.add.collider(this.player, this.platforms);
-  this.physics.add.overlap(this.player, this.ladders, (p) => p.setData('onLadderZone', true));
-  this.physics.add.overlap(this.player, this.stations, (p, s) => {
-    if (!s.getData('completed')) startStationSequence.call(this, s);
+  this.physics.add.overlap(player, stations, stationTouched, null, this);
+
+  // Puerta y bandera
+  this.door = this.physics.add.staticSprite(WORLD_W - 600, WORLD_H - 120, "door");
+  this.flag = this.physics.add.staticSprite(WORLD_W - 200, WORLD_H - 120, "flag");
+
+  this.physics.add.collider(player, this.door);
+
+  this.physics.add.overlap(player, this.flag, () => {
+    if (stations.every(s => s.getData("completed"))) {
+      showEndMessage.call(this);
+    }
   });
 
-  // Puerta y Bandera
-  this.door = this.physics.add.staticSprite(WORLD_W - 600, WORLD_H - 120, 'door');
-  this.physics.add.collider(this.player, this.door);
-  this.flag = this.physics.add.staticSprite(WORLD_W - 200, WORLD_H - 120, 'flag');
+  // Controles
+  cursors = this.input.keyboard.createCursorKeys();
 
   // UI
-  this.score = 0;
-  this.badges = { allComplete: false, highRouteComplete: false };
-  this.uiText = this.add.text(12, 12, '', { font: '16px Arial', fill: '#fff' }).setScrollFactor(0);
-  
-  createBitacora.call(this);
-  this.input.keyboard.on('keydown-B', () => toggleBitacora.call(this));
+  uiText = this.add
+    .text(16, 16, "", {
+      font: "16px Arial",
+      fill: "#ffffff"
+    })
+    .setScrollFactor(0);
+
+  updateUI();
 }
 
-// ---------- Update ----------
-function update(time, delta) {
-  const speed = 200;
-  if (this.cursors.left.isDown) {
-    this.player.setVelocityX(-speed);
-    this.player.flipX = true;
-  } else if (this.cursors.right.isDown) {
-    this.player.setVelocityX(speed);
-    this.player.flipX = false;
+// ---------- UPDATE ----------
+function update() {
+
+  const speed = 220;
+
+  if (cursors.left.isDown) {
+    player.setVelocityX(-speed);
+    player.flipX = true;
+  } else if (cursors.right.isDown) {
+    player.setVelocityX(speed);
+    player.flipX = false;
   } else {
-    this.player.setVelocityX(0);
+    player.setVelocityX(0);
+  }
+
+  // Salto
+  if (cursors.up.isDown && player.body.blocked.down) {
+    player.setVelocityY(-420);
   }
 
   // Escaleras
-  if (this.player.getData('onLadderZone') && (this.cursors.up.isDown || this.cursors.down.isDown)) {
-    this.player.body.allowGravity = false;
-    this.player.setVelocityY(this.cursors.up.isDown ? -120 : 120);
-  } else {
-    this.player.body.allowGravity = true;
-    if (Phaser.Input.Keyboard.JustDown(this.cursors.up) && this.player.body.blocked.down) {
-      this.player.setVelocityY(-360);
+  let onLadder = false;
+  ladders.children.iterate(ladder => {
+    if (Phaser.Geom.Intersects.RectangleToRectangle(player.getBounds(), ladder.getBounds())) {
+      onLadder = true;
     }
-  }
-  this.player.setData('onLadderZone', false); // Reset para el siguiente frame
+  });
 
-  this.fondo.tilePositionX = this.cameras.main.scrollX * 0.5;
-  updateUI.call(this);
-  checkHighRouteBadge.call(this);
+  if (onLadder && cursors.up.isDown) {
+    player.body.allowGravity = false;
+    player.setVelocityY(-150);
+  } else {
+    player.body.allowGravity = true;
+  }
+
+  updateUI();
 }
 
-// ---------- Helpers ----------
+// ---------- FUNCIONES ----------
 
-function ensureProceduralTextures() {
-  const g = this.make.graphics({ x: 0, y: 0, add: false });
-  if (!this.textures.exists('fondo')) {
-    g.fillStyle(0x4a1a13, 1);
-    g.fillRect(0, 0, 800, 600);
-    g.generateTexture('fondo', 800, 600);
-  }
-  if (!this.textures.exists('ground')) {
-    g.clear(); g.fillStyle(0x7a5c3a, 1); g.fillRect(0, 0, 200, 32);
-    g.generateTexture('ground', 200, 32);
-  }
-  if (!this.textures.exists('player')) {
-    g.clear(); g.fillStyle(0xff6f61, 1); g.fillRect(0, 0, 32, 48);
-    g.generateTexture('player', 32, 48);
-  }
-  if (!this.textures.exists('station')) {
-    g.clear(); g.fillStyle(0xffd166, 1); g.fillCircle(16, 16, 16);
-    g.generateTexture('station', 32, 32);
-  }
-}
+function stationTouched(player, station) {
+  if (station.getData("completed")) return;
 
-function startStationSequence(stationSprite) {
-  const meta = stationSprite.getData('meta');
-  stationSprite.setData('completed', true);
-  stationSprite.setTint(0x6ee7b7);
-  this.score += 100;
-  
-  if (this.stationSprites.every(s => s.getData('completed'))) {
-    if (this.door) this.door.destroy();
-  }
-}
+  station.setTint(0x6ee7b7);
+  station.setData("completed", true);
 
-function createBitacora() {
-  this.bitacoraContainer = this.add.container(20, 60).setScrollFactor(0).setVisible(false);
-  const bg = this.add.rectangle(0, 0, 300, 200, 0x000000, 0.8).setOrigin(0);
-  this.bitacoraText = this.add.text(10, 10, 'Bitácora', { font: '14px Arial', fill: '#fff' });
-  this.bitacoraContainer.add([bg, this.bitacoraText]);
-}
+  const text = this.add.text(
+    station.x - 40,
+    station.y - 50,
+    "✔ " + station.getData("title"),
+    { font: "14px Arial", fill: "#6ee7b7" }
+  );
 
-function toggleBitacora() {
-  const v = !this.bitacoraContainer.visible;
-  this.bitacoraContainer.setVisible(v);
-  if (v) {
-    let txt = "ESTACIONES:\n";
-    this.stationsData.forEach(s => txt += `${s.title}: ${s.completed ? 'OK' : '...'}\n`);
-    this.bitacoraText.setText(txt);
-  }
+  this.tweens.add({
+    targets: text,
+    y: text.y - 30,
+    alpha: 0,
+    duration: 1200,
+    onComplete: () => text.destroy()
+  });
 }
 
 function updateUI() {
-  const completed = this.stationSprites.filter(s => s.getData('completed')).length;
-  this.uiText.setText(`Exploración: ${completed}/${this.stationSprites.length}\nScore: ${this.score}`);
+  const done = stations.filter(s => s.getData("completed")).length;
+  uiText.setText(`Estaciones: ${done} / ${stations.length}`);
 }
 
-function checkHighRouteBadge() {
-  if (this.badges.highRouteComplete) return;
-  const allHigh = this.highRouteStations.every(s => s.getData('completed'));
-  if (allHigh && this.highRouteStations.length > 0) {
-    this.badges.highRouteComplete = true;
-    console.log("¡Insignia Ruta Alta obtenida!");
-  }
+function showEndMessage() {
+  this.add
+    .rectangle(400, 300, 500, 200, 0x000000, 0.8)
+    .setScrollFactor(0);
+
+  this.add
+    .text(400, 260, "MISIÓN COMPLETADA", {
+      font: "28px Arial",
+      fill: "#ffd166"
+    })
+    .setOrigin(0.5)
+    .setScrollFactor(0);
+
+  this.add
+    .text(400, 310, "Explorador Marciano 🏅", {
+      font: "18px Arial",
+      fill: "#ffffff"
+    })
+    .setOrigin(0.5)
+    .setScrollFactor(0);
 }
