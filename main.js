@@ -21,9 +21,9 @@ const game = new Phaser.Game(config);
 // ---------- Preload ----------
 function preload() {
   // Intentamos cargar assets externos si existen; si no, generamos texturas procedurales en create.
-  this.load.image('ground', 'assets/fondo.png');
+  this.load.image('ground', 'assets/ground.png');
   this.load.image('ladder', 'assets/ladder.png');
-  this.load.image('player', 'assets/jugador.png');
+  this.load.image('player', 'assets/player.png');
   this.load.image('station', 'assets/station.png');
   this.load.image('door', 'assets/door.png');
   this.load.image('flag', 'assets/flag.png');
