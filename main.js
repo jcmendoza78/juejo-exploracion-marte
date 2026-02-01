@@ -75,10 +75,13 @@ function create() {
   ladder3.body.setSize(40, 160).setOffset(-20, -80);
 
   // --- Jugador ---
-  this.player = this.physics.add.sprite(100, 450, 'player');
-  this.player.setCollideWorldBounds(true);
-  this.player.body.setSize(this.player.width * 0.6, this.player.height * 0.9).setOffset(this.player.width * 0.2, 0);
-  this.player.setBounce(0.05);
+  player = this.physics.add.sprite(100, 450, "player").setScale(0.5);
+  player.setCollideWorldBounds(true);
+  player.setBounce(0.05);
+  
+  // Ajustar hitbox después de escalar
+  player.body.setSize(player.width * 0.6, player.height * 0.9);
+  player.body.setOffset(player.width * 0.2, 0);
 
   // --- Controles ---
   this.cursors = this.input.keyboard.createCursorKeys();
