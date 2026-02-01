@@ -40,6 +40,7 @@ function create() {
   this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
 
   // Fondo con parallax
+  ensureProceduralTextures.call(this);
   this.bg = this.add.tileSprite(0, 0, config.width, config.height, "background")
     .setOrigin(0)
     .setScrollFactor(0)
@@ -48,182 +49,85 @@ function create() {
   // Plataformas
   this.platforms = this.physics.add.staticGroup();
   for (let x = 0; x < WORLD_W; x += 200) {
-    this.platforms.create(x + 100, WORLD_H - 20, "ground");
+    this.platforms.create(x + 100, WORLD_H - 20, "ground").refreshBody();
   }
+  // Ruta baja
+  this.platforms.create(400, 500, "ground").refreshBody();
+  this.platforms.create(800, 520, "ground").refreshBody();
+  this.platforms.create(1200, 540, "ground").refreshBody();
+  this.platforms.create(1600, 520, "ground").refreshBody();
+  this.platforms.create(2000, 540, "ground").refreshBody();
+  // Ruta alta
+  this.platforms.create(400, 300, "ground").refreshBody();
+  this.platforms.create(800, 320, "ground").refreshBody();
+  this.platforms.create(1200, 340, "ground").refreshBody();
+  this.platforms.create(1800, 300, "ground").refreshBody();
+  this.platforms.create(2400, 320, "ground").refreshBody();
+
+  // Escaleras
+  this.ladders = this.physics.add.staticGroup();
+  this.ladders.create(600, 400, "ladder");
+  this.ladders.create(1000, 420, "ladder");
+  this.ladders.create(2100, 360, "ladder");
 
   // Jugador
   this.player = this.physics.add.sprite(100, 450, "player").setScale(0.5);
   this.player.setCollideWorldBounds(true);
   this.player.setBounce(0.05);
-  this.player.body.setSize(this.player.width * 0.6, this.player.height * 0.9);
-  this.player.body.setOffset(this.player.width * 0.2, 0);
-
   this.physics.add.collider(this.player, this.platforms);
 
-  // Puerta
-  this.door = this.physics.add.staticSprite(WORLD_W - 600, WORLD_H - 120, "door");
-  this.physics.add.collider(this.player, this.door);
-  this.physics.add.overlap(this.player, this.door, () => {
-    showEndMessage.call(this);
+  // Controles
+  this.cursors = this.input.keyboard.createCursorKeys();
+
+  // Estaciones educativas
+  this.stationsData = [
+    { id: 0, title: "Atmósfera", x: 400, y: 260, route: "high", facts: ["95% CO2", "Presión muy baja"] },
+    { id: 1, title: "Agua y hielo", x: 800, y: 480, route: "low", facts: ["Casquetes polares", "Hielo subterráneo"] },
+    { id: 2, title: "Geología", x: 1200, y: 300, route: "high", facts: ["Monte Olimpo", "Cráteres abundantes"] },
+    { id: 3, title: "Misiones", x: 1600, y: 500, route: "low", facts: ["Curiosity desde 2012", "Perseverance llegó en 2021"] },
+    { id: 4, title: "Radiación", x: 2000, y: 280, route: "high", facts: ["Radiación mayor", "Protección necesaria"] },
+    { id: 5, title: "Comunicación", x: 2400, y: 320, route: "high", facts: ["Retraso ~20 min", "Orbitadores como repetidores"] }
+  ];
+  this.stations = this.physics.add.staticGroup();
+  this.stationSprites = [];
+  this.stationsData.forEach(st => {
+    const sprite = this.stations.create(st.x, st.y, "station");
+    sprite.setData("meta", st);
+    sprite.setData("completed", false);
+    this.stationSprites.push(sprite);
+  });
+  this.physics.add.overlap(this.player, this.stations, (player, station) => {
+    if (!station.getData("completed")) {
+      startStationSequence.call(this, station);
+    }
   });
 
-  // Bandera opcional
+  // Puerta y bandera
+  this.door = this.physics.add.staticSprite(WORLD_W - 600, WORLD_H - 120, "door");
   this.flag = this.physics.add.staticSprite(WORLD_W - 200, WORLD_H - 120, "flag");
+  this.physics.add.collider(this.player, this.door);
   this.physics.add.overlap(this.player, this.flag, () => {
-    showEndMessage.call(this);
+    onLevelComplete.call(this);
   });
 
   // Cámara
   this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
 
   // UI
-  this.uiText = this.add.text(16, 16, "Explora Marte y llega a la puerta", {
-    font: "16px Arial",
-    fill: "#ffffff"
-  }).setScrollFactor(0);
-
-
-  // Plataformas ruta baja (más accesible)
-  this.platforms.create(400, 500, 'ground').refreshBody();
-  this.platforms.create(800, 520, 'ground').refreshBody();
-  this.platforms.create(1200, 540, 'ground').refreshBody();
-  this.platforms.create(1600, 520, 'ground').refreshBody();
-  this.platforms.create(2000, 540, 'ground').refreshBody();
-
-  // Plataformas ruta alta (más retadora)
-  this.platforms.create(400, 300, 'ground').refreshBody();
-  this.platforms.create(800, 320, 'ground').refreshBody();
-  this.platforms.create(1200, 340, 'ground').refreshBody();
-  this.platforms.create(1800, 300, 'ground').refreshBody();
-  this.platforms.create(2400, 320, 'ground').refreshBody();
-
-  // Conectores tipo escalera (sprites con overlap)
-  this.ladders = this.physics.add.staticGroup();
-  const ladder1 = this.ladders.create(600, 400, 'ladder').setOrigin(0.5, 0.5);
-  const ladder2 = this.ladders.create(1000, 420, 'ladder').setOrigin(0.5, 0.5);
-  const ladder3 = this.ladders.create(2100, 360, 'ladder').setOrigin(0.5, 0.5);
-  ladder1.body.setSize(40, 160).setOffset(-20, -80);
-  ladder2.body.setSize(40, 160).setOffset(-20, -80);
-  ladder3.body.setSize(40, 160).setOffset(-20, -80);
-
-  // --- Jugador ---
-  this.player = this.physics.add.sprite(100, 450, 'player');
-  this.player.setCollideWorldBounds(true);
-  this.player.body.setSize(this.player.width * 0.6, this.player.height * 0.9).setOffset(this.player.width * 0.2, 0);
-  this.player.setBounce(0.05);
-
-  // --- Controles ---
-  this.cursors = this.input.keyboard.createCursorKeys();
-  this.keyB = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.B);
-  this.keyM = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M);
-
-  // --- Coyote time y jump buffer ---
-  this.coyoteTimeMax = 120; // ms
-  this.jumpBufferMax = 150; // ms
-  this.coyoteTimer = 0;
-  this.jumpBufferTimer = 0;
-
-  // --- Colisiones ---
-  this.physics.add.collider(this.player, this.platforms);
-
-  // --- Ladders overlap handling ---
-  this.onLadder = false;
-  this.physics.add.overlap(this.player, this.ladders, (player, ladder) => {
-    // marcar que está en zona de escalera; no desactivar gravedad aún
-    player.setData('onLadderZone', true);
-    player.setData('ladder', ladder);
-  }, null, this);
-
-  // limpiar flag cuando sale de ladder zone
-  this.physics.add.overlap(this.player, this.ladders, null, (player, ladder) => {
-    // la función anterior marca la zona; aquí no hacemos nada extra
-    return false;
-  }, this);
-
-  // detectar salida de zona de escalera con un pequeño timer en update
-
-  // --- Estaciones educativas ---
-  // Definimos estaciones con tema, posición, ruta (high/low) y 2 mini-retos
-  this.stationsData = [
-    { id: 0, title: 'Atmósfera', x: 400, y: 260, route: 'high', facts: ['95% CO2', 'Presión muy baja'] },
-    { id: 1, title: 'Agua y hielo', x: 800, y: 480, route: 'low', facts: ['Casquetes polares', 'Hielo subterráneo'] },
-    { id: 2, title: 'Geología', x: 1200, y: 300, route: 'high', facts: ['Monte Olimpo', 'Cráteres abundantes'] },
-    { id: 3, title: 'Misiones', x: 1600, y: 500, route: 'low', facts: ['Curiosity desde 2012', 'Perseverance llegó en 2021'] },
-    { id: 4, title: 'Radiación', x: 2000, y: 280, route: 'high', facts: ['Radiación mayor', 'Protección necesaria'] },
-    { id: 5, title: 'Comunicación', x: 2400, y: 320, route: 'high', facts: ['Retraso ~20 min', 'Orbitadores como repetidores'] }
-  ];
-
-  // Restaurar progreso desde localStorage si existe
-  const saved = loadProgress();
-  if (saved && saved.stations) {
-    // merge saved completed flags into stationsData
-    this.stationsData.forEach(sd => {
-      const s = saved.stations.find(x => x.id === sd.id);
-      if (s) sd.completed = !!s.completed;
-    });
-  }
-
-  this.stations = this.physics.add.staticGroup();
-  this.stationSprites = [];
-  this.highRouteStations = [];
-  this.stationsData.forEach(st => {
-    const sprite = this.stations.create(st.x, st.y, 'station');
-    sprite.setData('meta', st);
-    sprite.setData('completed', !!st.completed);
-    if (st.completed) sprite.setTint(0x6ee7b7);
-    this.stationSprites.push(sprite);
-    if (st.route === 'high') this.highRouteStations.push(sprite);
-  });
-
-  this.physics.add.overlap(this.player, this.stations, (player, station) => {
-    if (!station.getData('completed')) {
-      startStationSequence.call(this, station);
-    }
-  }, null, this);
-
-  // --- Puerta y bandera ---
-  this.door = this.physics.add.staticSprite(WORLD_W - 600, WORLD_H - 120, 'door');
-  this.flag = this.physics.add.staticSprite(WORLD_W - 200, WORLD_H - 120, 'flag');
-  this.flag.setData('reached', false);
-
-  // Bloqueo físico por puerta
-  this.physics.add.collider(this.player, this.door);
-
-  // Overlap con bandera para terminar nivel
-  this.physics.add.overlap(this.player, this.flag, () => {
-    const allDone = this.stationSprites.every(s => s.getData('completed'));
-    if (allDone && !this.flag.getData('reached')) {
-      this.flag.setData('reached', true);
-      onLevelComplete.call(this);
-    }
-  }, null, this);
-
-  // --- Cámara ---
-  this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
-
-  // --- UI y bitácora ---
-  this.score = saved && saved.score ? saved.score : 0;
-  this.completedStations = this.stationSprites.filter(s => s.getData('completed')).length;
+  this.score = 0;
+  this.completedStations = 0;
   this.totalStations = this.stationSprites.length;
-  this.uiText = this.add.text(12, 12, '', { font: '16px Arial', fill: '#ffffff' }).setScrollFactor(0);
+  this.uiText = this.add.text(12, 12, "", { font: "16px Arial", fill: "#ffffff" }).setScrollFactor(0);
   updateUI.call(this);
 
-  // Bitácora container (oculto)
+  // Bitácora
   createBitacora.call(this);
+  this.input.keyboard.on("keydown-B", () => toggleBitacora.call(this));
+  this.input.keyboard.on("keydown-M", () => toggleBitacora.call(this));
 
-  // Toggle bitácora
-  this.input.keyboard.on('keydown-B', () => toggleBitacora.call(this));
-  this.input.keyboard.on('keydown-M', () => toggleBitacora.call(this));
-
-  // --- Insignias estado ---
-  this.badges = saved && saved.badges ? saved.badges : { allComplete: false, highRouteComplete: false };
-
-  // Mensaje inicial si ya completado
-  if (this.badges.allComplete) {
-    this.add.text(300, 80, '🏅 Insignia: Explorador Marciano', { font: '18px Arial', fill: '#ffd166' }).setScrollFactor(0);
-  }
+  // Insignias
+  this.badges = { allComplete: false, highRouteComplete: false };
 }
-
 // ---------- Update ----------
 function update(time, delta) {
   // Movimiento lateral
