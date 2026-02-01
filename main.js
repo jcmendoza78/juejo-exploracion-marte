@@ -81,7 +81,7 @@ function create() {
     font: "16px Arial",
     fill: "#ffffff"
   }).setScrollFactor(0);
-}
+
 
   // Plataformas ruta baja (más accesible)
   this.platforms.create(400, 500, 'ground').refreshBody();
