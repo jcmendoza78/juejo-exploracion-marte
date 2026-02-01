@@ -34,22 +34,54 @@ function preload() {
 
 // ---------- Create ----------
 function create() {
-  // --- Mundo y cámara ---
   const WORLD_W = 3000;
   const WORLD_H = 600;
   this.physics.world.setBounds(0, 0, WORLD_W, WORLD_H);
   this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
 
-  // --- Texturas procedurales de respaldo si faltan assets ---
-  ensureProceduralTextures.call(this);
+  // Fondo con parallax
+  this.bg = this.add.tileSprite(0, 0, config.width, config.height, "background")
+    .setOrigin(0)
+    .setScrollFactor(0)
+    .setDepth(-1);
 
-  // --- Plataformas ---
+  // Plataformas
   this.platforms = this.physics.add.staticGroup();
-  // Suelo continuo
   for (let x = 0; x < WORLD_W; x += 200) {
-    const p = this.platforms.create(x + 100, WORLD_H - 20, 'ground');
-    p.setScale(1).refreshBody();
+    this.platforms.create(x + 100, WORLD_H - 20, "ground");
   }
+
+  // Jugador
+  this.player = this.physics.add.sprite(100, 450, "player").setScale(0.5);
+  this.player.setCollideWorldBounds(true);
+  this.player.setBounce(0.05);
+  this.player.body.setSize(this.player.width * 0.6, this.player.height * 0.9);
+  this.player.body.setOffset(this.player.width * 0.2, 0);
+
+  this.physics.add.collider(this.player, this.platforms);
+
+  // Puerta
+  this.door = this.physics.add.staticSprite(WORLD_W - 600, WORLD_H - 120, "door");
+  this.physics.add.collider(this.player, this.door);
+  this.physics.add.overlap(this.player, this.door, () => {
+    showEndMessage.call(this);
+  });
+
+  // Bandera opcional
+  this.flag = this.physics.add.staticSprite(WORLD_W - 200, WORLD_H - 120, "flag");
+  this.physics.add.overlap(this.player, this.flag, () => {
+    showEndMessage.call(this);
+  });
+
+  // Cámara
+  this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+
+  // UI
+  this.uiText = this.add.text(16, 16, "Explora Marte y llega a la puerta", {
+    font: "16px Arial",
+    fill: "#ffffff"
+  }).setScrollFactor(0);
+}
 
   // Plataformas ruta baja (más accesible)
   this.platforms.create(400, 500, 'ground').refreshBody();
@@ -204,6 +236,10 @@ function update(time, delta) {
     this.player.flipX = false;
   } else {
     this.player.setVelocityX(0);
+    // Salto normal
+    if (this.cursors.up.isDown && this.player.body.blocked.down) {
+    this.player.setVelocityY(-600); // más negativo = más alto
+}
   }
 
   // Ladder logic: si está en zona de escalera y presiona arriba/abajo, desactivar gravedad y mover
@@ -211,7 +247,7 @@ function update(time, delta) {
   if (onLadderZone && (this.cursors.up.isDown || this.cursors.down.isDown)) {
     this.player.body.allowGravity = false;
     if (this.cursors.up.isDown) {
-      this.player.setVelocityY(-120);
+      this.player.setVelocityY(-130);
     } else if (this.cursors.down.isDown) {
       this.player.setVelocityY(120);
     } else {
