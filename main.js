@@ -5,14 +5,13 @@ const GAME_WIDTH = 800;
 const GAME_HEIGHT = 600;
 const WORLD_HEIGHT = 600;
 
-const PLAYER_SPEED = 200;
-const JUMP_FORCE = 360;
-const GRAVITY_Y = 600;
-
+const PLAYER_SPEED = 220;
+const JUMP_FORCE = 380;
+const GRAVITY_Y = 700;
 const AUTOSAVE_INTERVAL = 2000;
 
 /* ============================================================
-   NIVELES (DESBLOQUEO PROGRESIVO)
+   NIVELES
 ============================================================ */
 const LEVELS = [
   {
@@ -64,17 +63,18 @@ new Phaser.Game(config);
    PRELOAD
 ============================================================ */
 function preload() {
-  ["ground","player","station","flag"].forEach(a =>
-    this.load.image(a, `assets/${a}.png`)
-  );
+  this.load.image("ground", "assets/ground.png");
+  this.load.image("station", "assets/station.png");
+  this.load.image("flag", "assets/flag.png");
 
-  if (!this.textures.exists("bg")) {
-    const g = this.add.graphics();
-    g.fillStyle(0x061433, 1);
-    g.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-    g.generateTexture("bg", GAME_WIDTH, GAME_HEIGHT);
-    g.destroy();
-  }
+  // NUEVO JUGADOR DINÁMICO
+  this.load.spritesheet("player", "assets/player.png", {
+    frameWidth: 512,
+    frameHeight: 512
+  });
+
+  // FONDO MARTE
+  this.load.image("marsBg", "assets/mars_background.png");
 }
 
 /* ============================================================
@@ -85,19 +85,15 @@ function create() {
   this.lastSave = 0;
   this.cursors = this.input.keyboard.createCursorKeys();
 
-  // FULLSCREEN AL PRIMER CLIC / TOQUE
   this.input.once("pointerdown", () => {
-    if (!this.scale.isFullscreen) {
-      this.scale.startFullscreen();
-    }
+    if (!this.scale.isFullscreen) this.scale.startFullscreen();
   });
 
   loadProgress.call(this);
   loadLevel.call(this, currentLevelIndex);
 
   this.uiText = this.add.text(12, 12, "", {
-    font: "16px Arial",
-    fill: "#fff"
+    font: "16px Arial", fill: "#fff"
   }).setScrollFactor(0);
 }
 
@@ -117,22 +113,31 @@ function loadLevel(index) {
   this.physics.world.setBounds(0, 0, level.worldWidth, WORLD_HEIGHT);
   this.cameras.main.setBounds(0, 0, level.worldWidth, WORLD_HEIGHT);
 
-  this.add.image(0, 0, "bg").setOrigin(0).setScrollFactor(0);
+  this.add.image(0, 0, "marsBg").setOrigin(0).setScrollFactor(0);
 
+  // Plataformas
   this.platforms = this.physics.add.staticGroup();
-  for (let x = 0; x < level.worldWidth; x += 200) {
+  for (let x = 0; x < level.worldWidth; x += 200)
     this.platforms.create(x + 100, WORLD_HEIGHT - 20, "ground");
-  }
 
+  // Jugador animado
   this.player = this.physics.add.sprite(
     level.playerStart.x,
     level.playerStart.y,
     "player"
-  ).setScale(0.5).setCollideWorldBounds(true);
+  ).setScale(0.18).setCollideWorldBounds(true);
+
+  this.anims.create({
+    key: "run",
+    frames: this.anims.generateFrameNumbers("player", { start: 0, end: 3 }),
+    frameRate: 8,
+    repeat: -1
+  });
 
   this.physics.add.collider(this.player, this.platforms);
   this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
 
+  // Estaciones
   this.stations = this.physics.add.staticGroup();
   level.stations.forEach(s => {
     const sp = this.stations.create(s.x, s.y, "station");
@@ -143,16 +148,14 @@ function loadLevel(index) {
     if (!st.getData("completed")) completeStation.call(this, st);
   });
 
+  // Meta
   this.flag = this.physics.add.staticSprite(
-    level.worldWidth - 200,
-    WORLD_HEIGHT - 120,
-    "flag"
+    level.worldWidth - 200, WORLD_HEIGHT - 120, "flag"
   );
 
   this.physics.add.overlap(this.player, this.flag, () => {
-    if (this.completedStations === this.totalStations) {
+    if (this.completedStations === this.totalStations)
       onLevelComplete.call(this);
-    }
   });
 }
 
@@ -162,9 +165,18 @@ function loadLevel(index) {
 function update(_, delta) {
   if (!this.player) return;
 
-  if (this.cursors.left.isDown) this.player.setVelocityX(-PLAYER_SPEED);
-  else if (this.cursors.right.isDown) this.player.setVelocityX(PLAYER_SPEED);
-  else this.player.setVelocityX(0);
+  if (this.cursors.left.isDown) {
+    this.player.setVelocityX(-PLAYER_SPEED);
+    this.player.setFlipX(true);
+    this.player.play("run", true);
+  } else if (this.cursors.right.isDown) {
+    this.player.setVelocityX(PLAYER_SPEED);
+    this.player.setFlipX(false);
+    this.player.play("run", true);
+  } else {
+    this.player.setVelocityX(0);
+    this.player.anims.stop();
+  }
 
   if (this.cursors.up.isDown && this.player.body.blocked.down)
     this.player.setVelocityY(-JUMP_FORCE);
@@ -228,8 +240,6 @@ function loadProgress() {
     this.score = d.score || 0;
     unlockedLevels = d.unlockedLevels || 1;
     currentLevelIndex = Math.min(d.currentLevelIndex || 0, unlockedLevels - 1);
-
     LEVELS.forEach((l, i) => l.unlocked = i < unlockedLevels);
   } catch {}
 }
-``
