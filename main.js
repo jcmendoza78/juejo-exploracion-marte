@@ -7,48 +7,32 @@ const WORLD_HEIGHT = 600;
 
 const PLAYER_SPEED = 200;
 const JUMP_FORCE = 360;
-const CLIMB_SPEED = 130;
 const GRAVITY_Y = 600;
 
-const COYOTE_TIME = 120;
-const JUMP_BUFFER = 150;
 const AUTOSAVE_INTERVAL = 2000;
 
 /* ============================================================
-   DEFINICIÓN DE NIVELES (DESBLOQUEO PROGRESIVO)
+   NIVELES (DESBLOQUEO PROGRESIVO)
 ============================================================ */
 const LEVELS = [
   {
     id: 1,
-    name: "Exploración Inicial",
     unlocked: true,
     worldWidth: 3000,
     playerStart: { x: 100, y: 450 },
     stations: [
-      { id: 0, title: "Atmósfera", x: 400, y: 260, facts: ["95% CO2"] },
-      { id: 1, title: "Agua y hielo", x: 800, y: 480, facts: ["Casquetes polares"] }
+      { id: 0, title: "Atmósfera", x: 400, y: 260 },
+      { id: 1, title: "Agua y hielo", x: 800, y: 480 }
     ]
   },
   {
     id: 2,
-    name: "Superficie Marciana",
     unlocked: false,
     worldWidth: 4000,
     playerStart: { x: 120, y: 450 },
     stations: [
-      { id: 2, title: "Geología", x: 900, y: 300, facts: ["Monte Olimpo"] },
-      { id: 3, title: "Misiones", x: 1500, y: 480, facts: ["Curiosity y Perseverance"] }
-    ]
-  },
-  {
-    id: 3,
-    name: "Riesgos del Planeta",
-    unlocked: false,
-    worldWidth: 4500,
-    playerStart: { x: 120, y: 450 },
-    stations: [
-      { id: 4, title: "Radiación", x: 2200, y: 260, facts: ["Radiación alta"] },
-      { id: 5, title: "Comunicación", x: 3500, y: 320, facts: ["Retraso de señal"] }
+      { id: 2, title: "Geología", x: 900, y: 300 },
+      { id: 3, title: "Misiones", x: 1500, y: 480 }
     ]
   }
 ];
@@ -57,7 +41,7 @@ let currentLevelIndex = 0;
 let unlockedLevels = 1;
 
 /* ============================================================
-   CONFIG PHASER
+   PHASER CONFIG
 ============================================================ */
 const config = {
   type: Phaser.AUTO,
@@ -66,6 +50,10 @@ const config = {
   physics: {
     default: "arcade",
     arcade: { gravity: { y: GRAVITY_Y }, debug: false }
+  },
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH
   },
   scene: { preload, create, update }
 };
@@ -76,15 +64,15 @@ new Phaser.Game(config);
    PRELOAD
 ============================================================ */
 function preload() {
-  ["ground","ladder","player","station","door","flag"].forEach(k =>
-    this.load.image(k, `assets/${k}.png`)
+  ["ground","player","station","flag"].forEach(a =>
+    this.load.image(a, `assets/${a}.png`)
   );
 
-  if (!this.textures.exists("background")) {
+  if (!this.textures.exists("bg")) {
     const g = this.add.graphics();
     g.fillStyle(0x061433, 1);
     g.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-    g.generateTexture("background", GAME_WIDTH, GAME_HEIGHT);
+    g.generateTexture("bg", GAME_WIDTH, GAME_HEIGHT);
     g.destroy();
   }
 }
@@ -95,46 +83,47 @@ function preload() {
 function create() {
   this.score = 0;
   this.lastSave = 0;
-
   this.cursors = this.input.keyboard.createCursorKeys();
-  this.physics.world.setBounds(0, 0, GAME_WIDTH, WORLD_HEIGHT);
+
+  // FULLSCREEN AL PRIMER CLIC / TOQUE
+  this.input.once("pointerdown", () => {
+    if (!this.scale.isFullscreen) {
+      this.scale.startFullscreen();
+    }
+  });
 
   loadProgress.call(this);
   loadLevel.call(this, currentLevelIndex);
 
   this.uiText = this.add.text(12, 12, "", {
-    font: "16px Arial", fill: "#fff"
+    font: "16px Arial",
+    fill: "#fff"
   }).setScrollFactor(0);
 }
 
 /* ============================================================
    LOAD LEVEL
 ============================================================ */
-function loadLevel(levelIndex) {
-  const level = LEVELS[levelIndex];
+function loadLevel(index) {
+  const level = LEVELS[index];
   if (!level || !level.unlocked) return;
 
   this.children.removeAll();
   this.physics.world.colliders.destroy();
 
-  this.currentLevel = level;
   this.completedStations = 0;
   this.totalStations = level.stations.length;
 
   this.physics.world.setBounds(0, 0, level.worldWidth, WORLD_HEIGHT);
   this.cameras.main.setBounds(0, 0, level.worldWidth, WORLD_HEIGHT);
 
-  this.add.tileSprite(0, 0, GAME_WIDTH, GAME_HEIGHT, "background")
-    .setOrigin(0)
-    .setScrollFactor(0)
-    .setDepth(-1);
+  this.add.image(0, 0, "bg").setOrigin(0).setScrollFactor(0);
 
-  // Plataformas
   this.platforms = this.physics.add.staticGroup();
-  for (let x = 0; x < level.worldWidth; x += 200)
+  for (let x = 0; x < level.worldWidth; x += 200) {
     this.platforms.create(x + 100, WORLD_HEIGHT - 20, "ground");
+  }
 
-  // Jugador
   this.player = this.physics.add.sprite(
     level.playerStart.x,
     level.playerStart.y,
@@ -144,11 +133,9 @@ function loadLevel(levelIndex) {
   this.physics.add.collider(this.player, this.platforms);
   this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
 
-  // Estaciones
   this.stations = this.physics.add.staticGroup();
-  level.stations.forEach(st => {
-    const sp = this.stations.create(st.x, st.y, "station");
-    sp.setData("meta", st);
+  level.stations.forEach(s => {
+    const sp = this.stations.create(s.x, s.y, "station");
     sp.setData("completed", false);
   });
 
@@ -156,14 +143,16 @@ function loadLevel(levelIndex) {
     if (!st.getData("completed")) completeStation.call(this, st);
   });
 
-  // Meta
   this.flag = this.physics.add.staticSprite(
-    level.worldWidth - 200, WORLD_HEIGHT - 120, "flag"
+    level.worldWidth - 200,
+    WORLD_HEIGHT - 120,
+    "flag"
   );
 
   this.physics.add.overlap(this.player, this.flag, () => {
-    if (this.completedStations === this.totalStations)
+    if (this.completedStations === this.totalStations) {
       onLevelComplete.call(this);
+    }
   });
 }
 
@@ -187,14 +176,14 @@ function update(_, delta) {
   }
 
   this.uiText.setText([
-    `Nivel: ${this.currentLevel.id}`,
+    `Nivel: ${LEVELS[currentLevelIndex].id}`,
     `Estaciones: ${this.completedStations}/${this.totalStations}`,
     `Puntos: ${this.score}`
   ]);
 }
 
 /* ============================================================
-   ESTACIONES Y PROGRESO
+   PROGRESO
 ============================================================ */
 function completeStation(station) {
   station.setTint(0x6ee7b7);
@@ -214,7 +203,7 @@ function onLevelComplete() {
 
   saveProgress.call(this);
 
-  this.time.delayedCall(1200, () => {
+  this.time.delayedCall(1000, () => {
     currentLevelIndex++;
     loadLevel.call(this, currentLevelIndex);
   });
